@@ -7,9 +7,9 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.file_path)?;
 
     let results = if config.ignore_case {
-        search_case_insensitive(&config.query, &contents)
+        search_case_insensitive(&config.query, &contents)?
     } else {
-        search(&config.query, &contents)
+        search(&config.query, &contents)?
     };
 
     for line in results {
@@ -19,14 +19,20 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let re = Regex::new(query).unwrap();
-    contents.lines().filter(|line| re.is_match(line)).collect()
+pub fn search<'a>(query: &str, contents: &'a str) -> Result<Vec<&'a str>, String> {
+    if let Ok(re) = Regex::new(query) {
+        Ok(contents.lines().filter(|line| re.is_match(line)).collect())
+    } else {
+        Err(format!("Cannot parse regex {query}"))
+    }
 }
 
-pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let re = Regex::new(format!("(?i){query}").as_str()).unwrap();
-    contents.lines().filter(|line| re.is_match(line)).collect()
+pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Result<Vec<&'a str>, String> {
+    if let Ok(re) = Regex::new(format!("(?i){query}").as_str()) {
+        Ok(contents.lines().filter(|line| re.is_match(line)).collect())
+    } else {
+        Err(format!("Cannot parse regex {query}"))
+    }
 }
 
 pub fn usage() {
@@ -91,7 +97,10 @@ Rust:
 safe, fast, productive.
 Pick three.
 Duct tape.";
-        assert_eq!(vec!["safe, fast, productive."], search(&query, contents));
+        assert_eq!(
+            Ok(vec!["safe, fast, productive."]),
+            search(&query, contents)
+        );
     }
 
     #[test]
@@ -103,7 +112,7 @@ safe, fast, productive.
 Pick three.
 Trust me.";
         assert_eq!(
-            vec!["Rust:", "Trust me."],
+            Ok(vec!["Rust:", "Trust me."]),
             search_case_insensitive(&query, contents)
         );
     }
